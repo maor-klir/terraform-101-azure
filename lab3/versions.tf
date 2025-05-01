@@ -11,19 +11,11 @@ terraform {
       version = "~> 3.7.2"
     }
   }
-  # Configure the backend to store the state file in Azure Storage
+  # Configure the backend to store the state file in Azure Storage  
   backend "azurerm" {
-    resource_group_name  = "rg-terraform-101-terraform-state-dev"
-    storage_account_name = "stterraform101au654k"
-    container_name       = "tfstate"
-    key                  = "observability-dev"
   }
 }
 # Configure the Microsoft Azure Provider
 provider "azurerm" {
   features {}
 }
-
-
-
-
