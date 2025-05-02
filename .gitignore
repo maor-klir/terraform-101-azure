@@ -13,3 +13,5 @@
 # exclude all .terraform lock files
 **/.terraform.lock.hcl
 
+# exclude VS Code settings file
+.vscode/
