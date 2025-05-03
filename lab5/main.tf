@@ -67,5 +67,5 @@ resource "azurerm_subnet_network_security_group_association" "alpha_remote_acces
 }
 
 data "http" "my_ip" {
-  url = "http://ifconfig.me/ip"
+  url = "https://api.ipify.org?format=text&ipv4=true"
 }
