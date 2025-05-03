@@ -11,8 +11,8 @@ resource "azurerm_public_ip" "vm1" {
   allocation_method   = "Static"
 }
 
-data "azurerm_subnet" "alpha" {
-  name                 = "snet-alpha"
+data "azurerm_subnet" "beta" {
+  name                 = "snet-beta"
   virtual_network_name = "vnet-network-dev"
   resource_group_name  = "rg-terraform-101-network-dev"
 }
@@ -24,7 +24,7 @@ resource "azurerm_network_interface" "vm1" {
 
   ip_configuration {
     name                          = "public"
-    subnet_id                     = data.azurerm_subnet.alpha.id
+    subnet_id                     = data.azurerm_subnet.beta.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.vm1.id
   }
@@ -35,16 +35,33 @@ resource "tls_private_key" "vm1" {
   algorithm = "ED25519"
 }
 
-resource "local_file" "private_key" {
-  content         = tls_private_key.vm1.private_key_pem
-  filename        = pathexpand("~/.ssh/vm1")
-  file_permission = "0600"
+data "azurerm_key_vault" "main" {
+  name                = "kv-devops-dev-jx1pjc"
+  resource_group_name = "rg-terraform-101-devops-dev"
 }
 
-resource "local_file" "public_key" {
-  content  = tls_private_key.vm1.public_key_openssh
-  filename = pathexpand("~/.ssh/vm1.pub")
+resource "azurerm_key_vault_secret" "vm1_ssh_private_key" {
+  name         = "vm1-private-ssh-key"
+  value        = tls_private_key.vm1.private_key_pem
+  key_vault_id = data.azurerm_key_vault.main.id
 }
+
+resource "azurerm_key_vault_secret" "vm1_ssh_public_key" {
+  name         = "vm1-public-ssh-key"
+  value        = tls_private_key.vm1.public_key_openssh
+  key_vault_id = data.azurerm_key_vault.main.id
+}
+
+# resource "local_file" "private_key" {
+#   content         = 
+#   filename        = pathexpand("~/.ssh/vm1")
+#   file_permission = "0600"
+# }
+
+# resource "local_file" "public_key" {
+#   content  = tls_private_key.vm1.public_key_openssh
+#   filename = pathexpand("~/.ssh/vm1.pub")
+# }
 
 resource "azurerm_linux_virtual_machine" "vm1" {
   name                = "vm1-${var.application_name}-${var.environment_name}"
@@ -55,7 +72,9 @@ resource "azurerm_linux_virtual_machine" "vm1" {
   network_interface_ids = [
     azurerm_network_interface.vm1.id,
   ]
-
+  identity {
+    type = "SystemAssigned"
+  }
   admin_ssh_key {
     username   = "adminuser"
     public_key = tls_private_key.vm1.public_key_openssh
@@ -72,4 +91,22 @@ resource "azurerm_linux_virtual_machine" "vm1" {
     sku       = "22_04-lts"
     version   = "latest"
   }
+}
+
+resource "azurerm_virtual_machine_extension" "entra_id_login" {
+  name                       = "${azurerm_linux_virtual_machine.vm1.name}-AADSSHLoginForLinux"
+  virtual_machine_id         = azurerm_linux_virtual_machine.vm1.id
+  publisher                  = "Microsoft.Azure.ActiveDirectory"
+  type                       = "AADSSHLoginForLinux"
+  type_handler_version       = "1.0"
+  auto_upgrade_minor_version = true
+
+}
+
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_role_assignment" "entra_id_user_login" {
+  scope                = azurerm_linux_virtual_machine.vm1.id
+  role_definition_name = "Virtual Machine User Login"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
