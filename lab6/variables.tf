@@ -10,3 +10,6 @@ variable "primary_location" {
   description = "The primary region for the resources"
   type        = string
 }
+variable "remote_access_users" {
+  type = list(string)
+}
